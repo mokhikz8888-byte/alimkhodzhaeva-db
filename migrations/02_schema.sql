@@ -237,4 +237,5 @@ COMMENT ON TABLE depot_buses IS 'История закрепления авто�
 COMMENT ON COLUMN depot_buses.depot_bus_id IS 'Уникальный идентификатор закрепления';
 COMMENT ON COLUMN depot_buses.depot_id IS 'Идентификатор автобусного парка';
 COMMENT ON COLUMN depot_buses.bus_id IS 'Идентификатор автобуса';
-COMMENT ON COLUMN depot
+COMMENT ON COLUMN depot_buses.assigned_from IS 'Дата начала закрепления';
+COMMENT ON COLUMN depot_buses.assigned_to IS 'Дата окончания закрепления, если оно завершено';
