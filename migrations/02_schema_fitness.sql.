@@ -1,1 +1,183 @@
+-- Проект: Фитнес-клуб
+-- Миграция 02: нормализованная структура базы данных
+-- Назначение: создание таблиц, первичных и внешних ключей
 
+-- 1. Клиенты фитнес-клуба
+CREATE TABLE clients (
+    client_id SERIAL PRIMARY KEY, -- Уникальный идентификатор клиента
+    full_name VARCHAR(100) NOT NULL, -- ФИО клиента
+    phone VARCHAR(20), -- Номер телефона
+    birth_date DATE -- Дата рождения
+);
+
+-- 2. Тренеры
+CREATE TABLE trainers (
+    trainer_id SERIAL PRIMARY KEY, -- Уникальный идентификатор тренера
+    full_name VARCHAR(100) NOT NULL, -- ФИО тренера
+    phone VARCHAR(20) -- Номер телефона тренера
+);
+
+-- 3. Справочник типов абонементов
+CREATE TABLE memberships (
+    membership_id SERIAL PRIMARY KEY, -- Уникальный идентификатор типа абонемента
+    membership_name VARCHAR(100) NOT NULL UNIQUE, -- Название абонемента
+    price NUMERIC(10, 2) NOT NULL CHECK (price >= 0), -- Стоимость абонемента
+    duration_days INTEGER NOT NULL CHECK (duration_days > 0) -- Срок действия в днях
+);
+
+-- 4. Абонементы, оформленные клиентами
+CREATE TABLE subscriptions (
+    subscription_id SERIAL PRIMARY KEY, -- Уникальный идентификатор оформленного абонемента
+    client_id INTEGER NOT NULL REFERENCES clients(client_id), -- Клиент
+    membership_id INTEGER NOT NULL REFERENCES memberships(membership_id), -- Тип абонемента
+    start_date DATE NOT NULL, -- Дата начала действия
+    end_date DATE NOT NULL, -- Дата окончания действия
+    CHECK (end_date >= start_date) -- Проверка периода действия
+);
+
+-- 5. Специализации тренеров
+CREATE TABLE specializations (
+    specialization_id SERIAL PRIMARY KEY, -- Уникальный идентификатор специализации
+    specialization_name VARCHAR(100) NOT NULL UNIQUE -- Название специализации
+);
+
+-- 6. Связь тренеров со специализациями (многие ко многим)
+CREATE TABLE trainer_specializations (
+    trainer_id INTEGER NOT NULL REFERENCES trainers(trainer_id), -- Идентификатор тренера
+    specialization_id INTEGER NOT NULL REFERENCES specializations(specialization_id), -- Идентификатор специализации
+    qualification_level VARCHAR(50), -- Уровень квалификации тренера по специализации
+    PRIMARY KEY (trainer_id, specialization_id) -- Составной первичный ключ
+);
+
+-- 7. Услуги фитнес-клуба
+CREATE TABLE services (
+    service_id SERIAL PRIMARY KEY, -- Уникальный идентификатор услуги
+    service_name VARCHAR(100) NOT NULL UNIQUE, -- Название услуги
+    price NUMERIC(10, 2) NOT NULL CHECK (price >= 0), -- Стоимость услуги
+    description TEXT -- Описание услуги
+);
+
+-- 8. Групповые занятия
+CREATE TABLE group_classes (
+    class_id SERIAL PRIMARY KEY, -- Уникальный идентификатор занятия
+    class_name VARCHAR(100) NOT NULL, -- Название занятия
+    trainer_id INTEGER NOT NULL REFERENCES trainers(trainer_id), -- Тренер занятия
+    service_id INTEGER REFERENCES services(service_id), -- Услуга, к которой относится занятие
+    class_time TIMESTAMP NOT NULL, -- Дата и время занятия
+    description TEXT -- Описание занятия
+);
+
+-- 9. Записи клиентов на групповые занятия (многие ко многим)
+CREATE TABLE class_enrollments (
+    client_id INTEGER NOT NULL REFERENCES clients(client_id), -- Клиент, записанный на занятие
+    class_id INTEGER NOT NULL REFERENCES group_classes(class_id), -- Групповое занятие
+    enrollment_date DATE NOT NULL DEFAULT CURRENT_DATE, -- Дата записи
+    enrollment_status VARCHAR(30) NOT NULL DEFAULT 'Записан', -- Статус записи
+    PRIMARY KEY (client_id, class_id) -- Один клиент записывается на занятие один раз
+);
+
+-- 10. Оборудование фитнес-клуба
+CREATE TABLE equipment (
+    equipment_id SERIAL PRIMARY KEY, -- Уникальный идентификатор оборудования
+    equipment_name VARCHAR(100) NOT NULL UNIQUE, -- Название оборудования
+    quantity INTEGER NOT NULL CHECK (quantity >= 0), -- Количество единиц оборудования
+    condition_status VARCHAR(30) NOT NULL -- Состояние оборудования
+);
+
+-- 11. Посещения — таблица фактов, планируемый объём 300 000 строк
+CREATE TABLE visits (
+    visit_id BIGSERIAL PRIMARY KEY, -- Уникальный идентификатор посещения
+    client_id INTEGER NOT NULL REFERENCES clients(client_id), -- Посетивший клуб клиент
+    visit_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Дата и время посещения
+    purpose TEXT -- Цель посещения
+);
+
+-- 12. Платежи клиентов
+CREATE TABLE payments (
+    payment_id BIGSERIAL PRIMARY KEY, -- Уникальный идентификатор платежа
+    client_id INTEGER NOT NULL REFERENCES clients(client_id), -- Клиент, совершивший оплату
+    amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0), -- Сумма платежа
+    payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Дата и время платежа
+    payment_method VARCHAR(30) NOT NULL, -- Способ оплаты
+    comment TEXT -- Комментарий к платежу
+);
+
+-- Индекс для быстрого поиска посещений по времени
+CREATE INDEX idx_visits_visit_time
+ON visits (visit_time);
+
+-- Комментарии к таблицам
+COMMENT ON TABLE clients IS 'Клиенты фитнес-клуба';
+COMMENT ON TABLE trainers IS 'Тренеры фитнес-клуба';
+COMMENT ON TABLE memberships IS 'Справочник типов абонементов';
+COMMENT ON TABLE subscriptions IS 'Абонементы, оформленные клиентами';
+COMMENT ON TABLE specializations IS 'Справочник специализаций тренеров';
+COMMENT ON TABLE trainer_specializations IS 'Связь тренеров с их специализациями';
+COMMENT ON TABLE services IS 'Услуги фитнес-клуба';
+COMMENT ON TABLE group_classes IS 'Расписание групповых занятий';
+COMMENT ON TABLE class_enrollments IS 'Записи клиентов на групповые занятия';
+COMMENT ON TABLE equipment IS 'Оборудование фитнес-клуба';
+COMMENT ON TABLE visits IS 'Таблица фактов посещений; ожидаемый объём — 300 000 строк';
+COMMENT ON TABLE payments IS 'Платежи клиентов фитнес-клуба';
+
+-- Комментарии к столбцам
+COMMENT ON COLUMN clients.client_id IS 'Первичный ключ клиента';
+COMMENT ON COLUMN clients.full_name IS 'ФИО клиента';
+COMMENT ON COLUMN clients.phone IS 'Контактный телефон клиента';
+COMMENT ON COLUMN clients.birth_date IS 'Дата рождения клиента';
+
+COMMENT ON COLUMN trainers.trainer_id IS 'Первичный ключ тренера';
+COMMENT ON COLUMN trainers.full_name IS 'ФИО тренера';
+COMMENT ON COLUMN trainers.phone IS 'Контактный телефон тренера';
+
+COMMENT ON COLUMN memberships.membership_id IS 'Первичный ключ типа абонемента';
+COMMENT ON COLUMN memberships.membership_name IS 'Название типа абонемента';
+COMMENT ON COLUMN memberships.price IS 'Стоимость абонемента';
+COMMENT ON COLUMN memberships.duration_days IS 'Продолжительность абонемента в днях';
+
+COMMENT ON COLUMN subscriptions.subscription_id IS 'Первичный ключ оформленного абонемента';
+COMMENT ON COLUMN subscriptions.client_id IS 'Внешний ключ клиента';
+COMMENT ON COLUMN subscriptions.membership_id IS 'Внешний ключ типа абонемента';
+COMMENT ON COLUMN subscriptions.start_date IS 'Дата начала действия абонемента';
+COMMENT ON COLUMN subscriptions.end_date IS 'Дата окончания действия абонемента';
+
+COMMENT ON COLUMN specializations.specialization_id IS 'Первичный ключ специализации';
+COMMENT ON COLUMN specializations.specialization_name IS 'Название специализации';
+
+COMMENT ON COLUMN trainer_specializations.trainer_id IS 'Внешний ключ тренера';
+COMMENT ON COLUMN trainer_specializations.specialization_id IS 'Внешний ключ специализации';
+COMMENT ON COLUMN trainer_specializations.qualification_level IS 'Уровень квалификации по специализации';
+
+COMMENT ON COLUMN services.service_id IS 'Первичный ключ услуги';
+COMMENT ON COLUMN services.service_name IS 'Название услуги';
+COMMENT ON COLUMN services.price IS 'Стоимость услуги';
+COMMENT ON COLUMN services.description IS 'Описание услуги';
+
+COMMENT ON COLUMN group_classes.class_id IS 'Первичный ключ занятия';
+COMMENT ON COLUMN group_classes.class_name IS 'Название занятия';
+COMMENT ON COLUMN group_classes.trainer_id IS 'Внешний ключ тренера';
+COMMENT ON COLUMN group_classes.service_id IS 'Внешний ключ услуги';
+COMMENT ON COLUMN group_classes.class_time IS 'Дата и время занятия';
+COMMENT ON COLUMN group_classes.description IS 'Описание занятия';
+
+COMMENT ON COLUMN class_enrollments.client_id IS 'Внешний ключ клиента';
+COMMENT ON COLUMN class_enrollments.class_id IS 'Внешний ключ группового занятия';
+COMMENT ON COLUMN class_enrollments.enrollment_date IS 'Дата записи клиента';
+COMMENT ON COLUMN class_enrollments.enrollment_status IS 'Текущий статус записи';
+
+COMMENT ON COLUMN equipment.equipment_id IS 'Первичный ключ оборудования';
+COMMENT ON COLUMN equipment.equipment_name IS 'Название оборудования';
+COMMENT ON COLUMN equipment.quantity IS 'Количество единиц оборудования';
+COMMENT ON COLUMN equipment.condition_status IS 'Текущее состояние оборудования';
+
+COMMENT ON COLUMN visits.visit_id IS 'Первичный ключ посещения';
+COMMENT ON COLUMN visits.client_id IS 'Внешний ключ клиента';
+COMMENT ON COLUMN visits.visit_time IS 'Дата и время посещения';
+COMMENT ON COLUMN visits.purpose IS 'Цель посещения';
+
+COMMENT ON COLUMN payments.payment_id IS 'Первичный ключ платежа';
+COMMENT ON COLUMN payments.client_id IS 'Внешний ключ клиента';
+COMMENT ON COLUMN payments.amount IS 'Сумма платежа';
+COMMENT ON COLUMN payments.payment_date IS 'Дата и время оплаты';
+COMMENT ON COLUMN payments.payment_method IS 'Способ оплаты';
+COMMENT ON COLUMN payments.comment IS 'Комментарий к платежу';
